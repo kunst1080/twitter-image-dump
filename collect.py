@@ -2,6 +2,9 @@ import sys
 from typing import List
 from common import get_twitter
 
+def msg(s):
+    sys.stderr.write(s + "\n")
+
 def get_media_urls(tw):
     """ツイートに紐づく画像URLの一覧を取得"""
     arr = []
@@ -14,11 +17,14 @@ def get_media_urls(tw):
                 arr.append(media_url)
     return arr
 
-def collect_urls(tweets):
+def collect_urls(tweets, favCounts):
     """{ツイートID-連番: {ツイートID, ユーザID, 画像URL}の辞書を作成"""
     dic = {}
     max_id = 0
     for tw in tweets:
+        favs = tw["favorite_count"]
+        if favs < favCounts:
+            continue
         tweet_id = tw["id"]
         screen_name = tw["user"]["screen_name"]
         max_id = tweet_id
@@ -45,36 +51,37 @@ def main(use_fav: bool, lists: List):
     dic = {}
     # ふぁぼ一覧の取得
     if use_fav:
+        msg("getting favs...")
         max_id = 0
         # 限界まで検索する
         for iii in range(30):
+            msg(str(iii))
             if max_id == 0:
-                max_id, data = collect_urls(t.favorites.list(count=200))
+                max_id, data = collect_urls(t.favorites.list(count=200), 10)
             else:
-                max_id, data = collect_urls(t.favorites.list(count=200, max_id=max_id))
-            if len(data) == 0:
-                break
+                max_id, data = collect_urls(t.favorites.list(count=200, max_id=max_id), 10)
             dic.update(data)
     # 指定されたリストからの取得
     #   対象リストの絞り込み -> リスト内のユーザーの一覧 -> ユーザIDからの画像取得
     mast_list = get_list_dict(t.lists.list(count=200))
     users = {}
     for lst in lists:
+        msg("getting users from list: " + lst)
         list_id = mast_list[lst]
         for u in t.lists.members(list_id=list_id)["users"]:
             user_id = u["id_str"]
             users[user_id] = user_id
     for u in users.keys():
+        msg("getting tweet from user: " + u)
         max_id = 0
         # 限界まで検索する
         for iii in range(30):
+            msg(str(iii))
             if max_id == 0:
-                max_id, data = collect_urls(t.statuses.user_timeline(user_id=u, count=200))
+                max_id, data = collect_urls(t.statuses.user_timeline(user_id=u, count=200), 100)
             else:
                 max_id, data = collect_urls(
-                    t.statuses.user_timeline(user_id=u, count=200, max_id=max_id))
-            if len(data) == 0:
-                break
+                    t.statuses.user_timeline(user_id=u, count=200, max_id=max_id), 100)
             dic.update(data)
     # 標準出力へ
     for item in dic.values():
