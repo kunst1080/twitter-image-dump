@@ -19,15 +19,16 @@ def get_media_urls(tw):
 
 def collect_urls(tweets, favCounts):
     """{ツイートID-連番: {ツイートID, ユーザID, 画像URL}の辞書を作成"""
+    msg("collect " + str(len(tweets)) + " tweets.")
     dic = {}
     max_id = 0
     for tw in tweets:
         favs = tw["favorite_count"]
-        if favs < favCounts:
-            continue
         tweet_id = tw["id"]
         screen_name = tw["user"]["screen_name"]
         max_id = tweet_id
+        if favs < favCounts:
+            continue
         for idx, url in enumerate(get_media_urls(tw)):
             key = str(tweet_id) + "-" + str(idx)
             dic[key] = {"tweet_id": tweet_id, "screen_name": screen_name, "url": url}
@@ -53,14 +54,19 @@ def main(use_fav: bool, lists: List):
     if use_fav:
         msg("getting favs...")
         max_id = 0
+        lst = []
         # 限界まで検索する
         for iii in range(30):
             msg(str(iii))
             if max_id == 0:
-                max_id, data = collect_urls(t.favorites.list(count=200), 10)
+                lst = t.favorites.list(count=200)
+                max_id, data = collect_urls(lst, 10)
             else:
-                max_id, data = collect_urls(t.favorites.list(count=200, max_id=max_id), 10)
+                lst = t.favorites.list(count=200, max_id=max_id)
+                max_id, data = collect_urls(lst, 10)
             dic.update(data)
+            if len(lst) < 100:
+                break
     # 指定されたリストからの取得
     #   対象リストの絞り込み -> リスト内のユーザーの一覧 -> ユーザIDからの画像取得
     mast_list = get_list_dict(t.lists.list(count=200))
@@ -70,19 +76,24 @@ def main(use_fav: bool, lists: List):
         list_id = mast_list[lst]
         for u in t.lists.members(list_id=list_id)["users"]:
             user_id = u["id_str"]
-            users[user_id] = user_id
-    for u in users.keys():
-        msg("getting tweet from user: " + u)
+            screen_name = u["screen_name"]
+            users[user_id] = screen_name
+    for u in users.items():
+        msg("getting tweet from user: " + u[1])
         max_id = 0
         # 限界まで検索する
         for iii in range(30):
             msg(str(iii))
+            lst = []
             if max_id == 0:
-                max_id, data = collect_urls(t.statuses.user_timeline(user_id=u, count=200), 100)
+                lst = t.statuses.user_timeline(user_id=u[0], count=200)
+                max_id, data = collect_urls(lst, 100)
             else:
-                max_id, data = collect_urls(
-                    t.statuses.user_timeline(user_id=u, count=200, max_id=max_id), 100)
+                lst = t.statuses.user_timeline(user_id=u[0], count=200, max_id=max_id)
+                max_id, data = collect_urls(lst, 100)
             dic.update(data)
+            if len(lst) < 100:
+                break
     # 標準出力へ
     for item in dic.values():
         tweet_id = item["tweet_id"]

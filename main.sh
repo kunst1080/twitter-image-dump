@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eu
+set -u
 
 mkdir -p .tmp
 cat list.txt | xargs python3 collect.py true > .tmp/download.txt
@@ -14,5 +14,9 @@ do
     echo $ID, $USER, $URL
     mkdir -p $OUTPUT
     wget "$URL:large" -O $OUTPUT/$FILENAME
-    echo $ID >> .tmp/downloaded.txt
+    if [ $? -eq 0 ]; then
+        echo $ID >> .tmp/downloaded.txt
+    else
+        echo $ID >> .tmp/error.txt
+    fi
 done 2>> log.txt
